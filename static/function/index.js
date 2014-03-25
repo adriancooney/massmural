@@ -1,30 +1,25 @@
 var Tile = require("./Tile"),
-	Wall = require("./Wall")
+	Wall = require("./Wall"),
+	Grid = require("./Grid");
 
 var canvas = global.canvas = document.getElementById("plate");
 var ctx = global.ctx = canvas.getContext("2d");
 
 // Event handlers
-window.addEventListener("resize", function() {
-	Wall.resize();
-});
+window.addEventListener("resize", Wall.onresize);
 
-var drag = null;
-canvas.addEventListener("mousedown", function(event) {
-	drag = event;
-});
+// Grab the starting coordinates
+if(window.location.hash) {
+	var coords = window.location.hash
+		.replace("#", "").split(",")
+		.map(function(coord) { return parseInt(coord); })
+		.slice(0, 2);
 
-canvas.addEventListener("mouseup", function(event) {
-	if(drag) {
-		// Handle drag
-		var dx = -(drag.x - event.x),
-			dy = -(drag.y - event.y);
+	Wall.x = coords[0];
+	Wall.y = coords[1];
+}
 
-		Wall.pan(dx, dy);
-	}
+window.wall = Wall;
 
-	drag = null;
-});
-
-// Initlize the wall
+// Initilize the wall
 Wall.init();

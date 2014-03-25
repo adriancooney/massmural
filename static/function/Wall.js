@@ -1,122 +1,200 @@
-var Tile = require("./Tile");
+var Tile = require("./Tile"),
+	Brushes = require("./brushes");
 
 var Wall = {
 	// The current wall coordinates
 	x: 0, 
 	y: 0,
 
-	tile: {
-		blank: null,
-		width: 400,
-		height: 300,
-		path: "tiles/",
-		filetype: ".png",
-		preload: 1 // How many tiles to preload around the perimeter
-	},
-
-	window: {
-		width: window.innerWidth,
-		height: window.innerHeight
-	},
+	// The wall size
+	width: window.innerWidth,
+	height: window.innerHeight,
 
 	// The tile store
-	tiles: {}
+	tiles: []
 };
 
 /**
  * Resize the wall to the window width.
  */
 Wall.resize = function() {
-	Wall.window.width = canvas.width = window.innerWidth;
-	Wall.window.height = canvas.height = window.innerHeight;
+	Wall.width = canvas.width = window.innerWidth;
+	Wall.height = canvas.height = window.innerHeight;
 };
 
 /**
- * Get a tile.
- * @param  {Number} x The tile that contains the coordinate.
- * @param  {Number} y 
+ * Update the wall.
  */
-Wall.getTile = function(x, y, callback) {
-	var tile = Wall.getTileName(x, y);
+Wall.update = function() {
 
-	// Test if the tile already exists
-	if(Wall.tiles[tile]) callback(Wall.tiles[tile]);
-	else {
-		// Retrieve the image and save to canvas
-		Wall.loadTile(tilename, callback);
-	}
 };
 
 /**
- * Load a tile from the server
- * @param {String} tilename 
+ * Render the wall's current tiles
  */
-Wall.loadTile = function(x, y, callback) {
-	var tile = new Image();
-
-	tile.onload = function() {
-		callback(tile, x, y);
-	};
-
-	tile.onerror = function() {
-		callback(Wall.tile.blank, x, y);
-	};
-
-	tile.src = Wall.getTileName(x, y);
-};
-
-/**
- * Get tiles for an origin.tty
- * @param  {Number}   x        
- * @param  {Number}   y        
- * @param  {Function} callback 
- */
-Wall.getTiles = function(x, y, callback) {
-	var w2 = Wall.window.width/2,
-		h2 = Wall.window.height/2,
-		tileCountX = Math.ceil(w2/Wall.tile.width),
-		tileCountY = Math.ceil(h2/Wall.tile.height),
-		tiles = [];
-
+Wall.render = function() {
+	// Fill the background
+	ctx.clearRect(0, 0, Wall.width, Wall.height);
 	
-	for(var dy = -tileCountY; dy <= tileCountY; dy++) 
-		for(var dx = -tileCountX; dx <= tileCountX; dx++) {
-			Wall.getTile(x + (dx * Wall.tile.width), y + (dy * Wall.tile.height), callback);
+
+	for(var y = 0, cy = Wall.tiles.height; y < cy; y++)
+		for(var x = 0, cx = Wall.tiles.width; x < cx; x++) {
+			var tile = Wall.tiles[y][x],
+				px = tile.x - Wall.x,
+				py = tile.y - Wall.y;
+
+			tile.render(ctx, px, py);
 		}
+
+
+	ctx.fillText(Wall.x + ", " + Wall.y, Wall.width/2, Wall.height/2);
+};
+
+Wall.getTile = function() {
+
 };
 
 /**
- * Return the tile name from scheme.
+ * Get tiles around a point.
+ */
+Wall.getTiles = function() {
+	var x = Wall.x,
+		y = Wall.y,
+
+		tx = Tile.width,
+		ty = Tile.height,
+
+		wx = Wall.x,
+		wy = Wall.y,
+
+		// The amount of tiles we need to get
+		lx = Math.ceil(Wall.width/tx) + 1,
+		ly = Math.ceil(Wall.height/ty) + 1,
+
+		// The tile overflow
+		px = Math.abs(x % tx),
+		py = Math.abs(y % ty),
+
+		// The origin of the top left most tile we need to get
+		ox = wx - px,
+		oy = wy - py;
+
+	for(var uy = 0; uy < ly; uy++) {
+		var row = [];
+		for(var ux = 0; ux < lx; ux++) {
+			// The coordinates of each tile we have to get
+			var ttx = ox + (tx * ux),
+				tty = oy + (ty * uy);
+
+			row.push(Tile.get(ttx, tty));
+		}
+
+		Wall.pushRow(Wall.BOTTOM_SIDE, row);
+	}	
+
+	// Add the wall dimensions in tiles to the tiles variable
+	Wall.tiles.width = lx;
+	Wall.tiles.height = ly;
+};
+
+/**
+ * Wall side constants.
+ * @type {Number}
+ */
+Wall.TOP_SIDE = 1;
+Wall.RIGHT_SIDE = 2;
+Wall.BOTTOM_SIDE = 3;
+Wall.LEFT_SIDE = 4;
+
+/**
+ * Add a row to the wall.
+ * @param  {Number} side  See Wall.[SIDE]_SIDE
+ * @param  {Array} tiles  Array of tiles.
+ */
+Wall.pushRow = function(side, tiles) {
+	if(side === Wall.TOP_SIDE) Wall.tiles.unshift(tiles), Wall.tiles.height++;
+	else if(side === Wall.BOTTOM_SIDE) Wall.tiles.push(tiles), Wall.tiles.height++;
+	else Wall.tiles.width++, Wall.tiles.forEach(function(row, i) {
+		if(side === Wall.LEFT_SIDE) row.unshift(tiles[i]);
+		else if(side === Wall.RIGHT_SIDE) row.push(tiles[i]); // Redundant if but keep it anyway
+	});
+};
+
+/**
+ * Remove a row from the wall.
+ * @param  {Number} side See Wall.[SIDE]_SIDE
+ */
+Wall.popRow = function(side) {
+	if(side === Wall.TOP_SIDE) Wall.tiles.shift(), Wall.tiles.height--;
+	else if(side === Wall.BOTTOM_SIDE) Wall.tiles.pop(), Wall.tiles.height--;
+	else Wall.tiles.width--, Wall.tiles.forEach(function(row) {
+		if(side === Wall.LEFT_SIDE) row.shift();
+		else if(side === Wall.RIGHT_SIDE) row.pop(); // Redundant if but keep it anyway
+	});
+};
+
+/**
+ * Get the next row of tiles.
+ * @param  {Number} side See Wall.[SIDE]_SIDE
+ * @return {Array}      Next row of tiles.
+ */
+Wall.getNextRow = function(side) {
+	return Wall.getRow(side).map(function(tile) {
+		return Tile.get(tile.x + ((side === Wall.LEFT_SIDE ? -1 : (side === Wall.RIGHT_SIDE ? 1 : 0)) * Tile.width), 
+			tile.y + ((side === Wall.TOP_SIDE ? -1 : (side === Wall.BOTTOM_SIDE ? 1 : 0)) * Tile.height));
+	});
+};
+
+/**
+ * Get a row given the side.
+ * @param  {Number} side See Wall.[SIDE]_SIDE
+ * @return {Array}      Row
+ */
+Wall.getRow = function(side) {
+	if(side === Wall.LEFT_SIDE || side === Wall.RIGHT_SIDE) return Wall.tiles.map(function(row) {
+		return row[side === Wall.LEFT_SIDE ? 0 : row.length - 1];
+	});
+
+	else return Wall.tiles[side === Wall.TOP_SIDE ? 0 : Wall.tiles.length - 1];
+};
+
+/**
+ * Pan the wall.
  * @param  {Number} x 
  * @param  {Number} y 
- * @return {String}   filename e.g. /tiles/-300_400.png -> Tile at -300/400
- */
-Wall.getTileName = function(x, y) {
-	return Wall.tile.path + x + "_" + y + Wall.tile.filetype;
-};
-
-/**
- * Pan the wall in given direction.
- * @param  {Number} x -/+
- * @param  {Number} y -/+
  */
 Wall.pan = function(x, y) {
-	// Pan the origin
-	Wall.x += x;
-	Wall.y += y;
+	var wx = Wall.x += x,
+		wy = Wall.y += y,
 
-	// context.drawImage( img, sx, sy, swidth, sheight, x, y, width, height );
-	// ctx.drawImage(canvas, 
-	// 	x < 0 ? x * -1 : 0,
-	// 	y < 0 ? y * -1 : 0,
-	// 	x > 0 ? canvas.width - x : canvas.width,
-	// 	y > 0 ? canvas.height - y : canvas.height,
-	// 	0, 0, canvas.width, canvas.height);
-	
-	ctx.drawImage(canvas, x, y);
-};
+		tw = Tile.width,
+		th = Tile.height,
 
-Wall.render = function() {
+		// Get top left tile
+		ttl = Wall.tiles[0][0], 
+
+		bleedx = tw * 0.4,
+		bleedy = th * 0.5;
+
+	if(wy > (ttl.y + th + bleedy)) {
+		Wall.popRow(Wall.TOP_SIDE);
+		Wall.pushRow(Wall.BOTTOM_SIDE, Wall.getNextRow(Wall.BOTTOM_SIDE));
+	}
+
+	if(wx > (ttl.x + th + bleedx)) {
+		Wall.popRow(Wall.LEFT_SIDE);
+		Wall.pushRow(Wall.RIGHT_SIDE, Wall.getNextRow(Wall.RIGHT_SIDE));
+	}
+
+	if(wy < (ttl.y + bleedy)) {
+		Wall.popRow(Wall.BOTTOM_SIDE);
+		Wall.pushRow(Wall.TOP_SIDE, Wall.getNextRow(Wall.TOP_SIDE));
+	}
+
+	if(wx < (ttl.x + bleedx)) {
+		Wall.popRow(Wall.RIGHT_SIDE);
+		Wall.pushRow(Wall.LEFT_SIDE, Wall.getNextRow(Wall.LEFT_SIDE));
+	}
 
 };
 
@@ -124,13 +202,36 @@ Wall.init = function() {
 	// Initially resize the wall to screen dimensions
 	Wall.resize();
 
-	// Create the blank tile.
-	var blank = Wall.tile.blank = document.createElement("canvas");
-	var bctx = blank.getContext("2d");
-	blank.width = Wall.tile.width;
-	blank.height = Wall.tile.height;
-	bctx.fillStyle = "#fff";
-	bctx.fillRect(0, 0, blank.width, blank.height);
+	// Bind the event handlers
+	var drag = null;
+	canvas.addEventListener("mousedown", function(event) {
+		drag = event;
+	});
+
+	canvas.addEventListener("mousemove", function(event) {
+		if(drag) Wall.ondrag.call(Wall, event, drag), drag = event;
+	});
+
+	canvas.addEventListener("mouseup", function(event) {
+		drag = null;
+	});
+
+	// Initially get the tiles
+	Wall.getTiles();
+
+	// And render
+	Wall.render();
+};
+
+// Event handlers
+Wall.ondrag = function(event, previous) {
+	Wall.pan(event.x - previous.x, event.y - previous.y);
+	Wall.render();
+};
+
+Wall.onresize = function(event) {
+	Wall.getTiles();
+	Wall.render();
 };
 
 module.exports = Wall;
