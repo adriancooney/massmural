@@ -1,0 +1,29 @@
+{
+  "name": "massmural",
+  "version": "0.0.1",
+  "description": "Online Collaborative Painting",
+  "main": "server/index.js",
+  "dependencies": {
+    "express": "~4.0.0-rc1",
+    "gulp-browserify": "~0.5.0",
+    "gulp": "~3.5.6",
+    "gulp-rename": "~1.2.0",
+    "multiparty": "~3.2.3"
+  },
+  "devDependencies": {
+    "mocha": "~1.18.0"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/adriancooney/massmural.git"
+  },
+  "author": "Adrian Cooney",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/adriancooney/massmural/issues"
+  },
+  "homepage": "https://github.com/adriancooney/massmural"
+}
