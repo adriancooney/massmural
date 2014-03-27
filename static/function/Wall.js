@@ -1,5 +1,6 @@
 var Tile = require("./Tile"),
-	Brushes = require("./brushes");
+	Brushes = require("./brushes"),
+	GUI = require("./GUI");
 
 var Wall = {
 	// The current wall coordinates
@@ -10,23 +11,11 @@ var Wall = {
 	width: window.innerWidth,
 	height: window.innerHeight,
 
+	// The render engine
+	running: true,
+
 	// The tile store
 	tiles: []
-};
-
-/**
- * Resize the wall to the window width.
- */
-Wall.resize = function() {
-	Wall.width = canvas.width = window.innerWidth;
-	Wall.height = canvas.height = window.innerHeight;
-};
-
-/**
- * Update the wall.
- */
-Wall.update = function() {
-
 };
 
 /**
@@ -35,23 +24,17 @@ Wall.update = function() {
 Wall.render = function() {
 	// Fill the background
 	ctx.clearRect(0, 0, Wall.width, Wall.height);
-	
 
+	// Loop over the tiles in the buffer
 	for(var y = 0, cy = Wall.tiles.height; y < cy; y++)
 		for(var x = 0, cx = Wall.tiles.width; x < cx; x++) {
 			var tile = Wall.tiles[y][x],
 				px = tile.x - Wall.x,
 				py = tile.y - Wall.y;
 
+			// Render the tiles at the correct coorindates
 			tile.render(ctx, px, py);
 		}
-
-
-	ctx.fillText(Wall.x + ", " + Wall.y, Wall.width/2, Wall.height/2);
-};
-
-Wall.getTile = function() {
-
 };
 
 /**
@@ -80,7 +63,9 @@ Wall.getTiles = function() {
 		oy = wy - py;
 
 	for(var uy = 0; uy < ly; uy++) {
+		// Create the row
 		var row = [];
+
 		for(var ux = 0; ux < lx; ux++) {
 			// The coordinates of each tile we have to get
 			var ttx = ox + (tx * ux),
@@ -89,6 +74,7 @@ Wall.getTiles = function() {
 			row.push(Tile.get(ttx, tty));
 		}
 
+		// And push the row to the wall
 		Wall.pushRow(Wall.BOTTOM_SIDE, row);
 	}	
 
@@ -159,6 +145,24 @@ Wall.getRow = function(side) {
 };
 
 /**
+ * Get a tile at a coordinate.
+ * @param  {Number} x 
+ * @param  {Number} y 
+ * @return {Tile} 
+ */
+Wall.getTileAtCoord = function(x, y) {
+	var ttl = Wall.tiles[0][0],
+		ox = ttl.x - Wall.x,
+		oy = ttl.y - Wall.y,
+		vw = Wall.tiles.width * Tile.width,
+		vh = Wall.tiles.height * Tile.height;
+
+	if(x > ox && x < vw && y > oy && y < vh) {
+		return Wall.tiles[Math.floor((y - oy)/Tile.height)][Math.floor((x - ox)/Tile.width)];
+	}
+};
+
+/**
  * Pan the wall.
  * @param  {Number} x 
  * @param  {Number} y 
@@ -174,7 +178,7 @@ Wall.pan = function(x, y) {
 		ttl = Wall.tiles[0][0], 
 
 		bleedx = tw * 0.4,
-		bleedy = th * 0.5;
+		bleedy = th * 0.3;
 
 	if(wy > (ttl.y + th + bleedy)) {
 		Wall.popRow(Wall.TOP_SIDE);
@@ -196,6 +200,31 @@ Wall.pan = function(x, y) {
 		Wall.pushRow(Wall.LEFT_SIDE, Wall.getNextRow(Wall.LEFT_SIDE));
 	}
 
+	GUI.setCoords(Wall.x, Wall.y);
+};
+
+/**
+ * Bake the current context onto the tiles.
+ */
+Wall.bake = function() {
+	//TODO: ACCOUNT FOR DAMN OFFSCREEN SHIT
+	for(var y = 0, ly = Wall.tiles.height; y < ly; y++)
+		for(var x = 0, lx = Wall.tiles.width; x < lx; x++) {
+			var tile = Wall.tiles[y][x],
+				tctx = tile.getContext(),
+
+				ww = Wall.width,
+				wh = Wall.height,
+
+				ox = tile.x - Wall.x,
+				oy = tile.y - Wall.y,
+
+				cx = ww - ox,
+				cy = wh - oy;
+
+			console.log(ox, oy, cx, cy);
+			
+		}
 };
 
 Wall.init = function() {
@@ -203,35 +232,81 @@ Wall.init = function() {
 	Wall.resize();
 
 	// Bind the event handlers
-	var drag = null;
-	canvas.addEventListener("mousedown", function(event) {
+	var drag = null, dragstart = false;
+	window.addEventListener("mousedown", function(event) {
+		event.preventDefault();
 		drag = event;
+		dragstart = true;
 	});
 
-	canvas.addEventListener("mousemove", function(event) {
-		if(drag) Wall.ondrag.call(Wall, event, drag), drag = event;
+	window.addEventListener("mousemove", function(event) {
+		if(dragstart) Wall.dragstart.call(Wall, event), dragstart = false;
+		if(drag) event.preventDefault(), Wall.drag.call(Wall, event, drag), drag = event;
 	});
 
-	canvas.addEventListener("mouseup", function(event) {
-		drag = null;
+	window.addEventListener("mouseup", function(event) {
+		event.preventDefault();
+		if(drag) Wall.dragend.call(Wall, event), drag = null;
 	});
+
+	window.addEventListener("mousewheel", function(event) {
+		Wall.pan(event.wheelDeltaX, event.wheelDeltaY);
+	});
+
+	// Event handlers
+	window.addEventListener("resize", function() {
+		Wall.resize();
+	});
+
+
+	// Bind the link handler. Pity I can't keep this in GUI.js,
+	// circular dependancies.
+	GUI.ui.link.addEventListener("click", function() {
+		window.location.hash = "#" + Wall.x + "," + Wall.y;
+	});
+
+	// Pick a brush
+	Brushes.current = Brushes.basic;
 
 	// Initially get the tiles
 	Wall.getTiles();
 
-	// And render
-	Wall.render();
+	// And begin the render loop
+	(function tick() {
+		requestAnimationFrame(tick);
+		if(Wall.running) Wall.render();
+	})();
 };
 
 // Event handlers
-Wall.ondrag = function(event, previous) {
-	Wall.pan(event.x - previous.x, event.y - previous.y);
-	Wall.render();
+Wall.dragstart = function(event) {
+	// Pause the render engine to give a chance for the drawing
+	Wall.running = false;
 };
 
-Wall.onresize = function(event) {
+Wall.dragend = function(event) {
+	// Saved what's drawn to the tiles and resume
+	Wall.bake();
+
+	Wall.running = true;
+};
+
+Wall.drag = function(event, previous) {
+	console.log("DRAGGED!", event.shiftKey);
+	if(event.shiftKey) Wall.pan(previous.x - event.x, previous.y - event.y), Wall.render();
+	else {
+		// Mark the tile as modified
+		Wall.getTileAtCoord(event.x, event.y).modified();
+
+		// Start the drawing 
+		Brushes.current.paint(ctx, event.x, event.y);
+	}
+};
+
+Wall.resize = function(event) {
+	Wall.width = canvas.width = window.innerWidth;
+	Wall.height = canvas.height = window.innerHeight;
 	Wall.getTiles();
-	Wall.render();
 };
 
 module.exports = Wall;

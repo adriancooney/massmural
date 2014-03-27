@@ -1,12 +1,10 @@
 var Tile = require("./Tile"),
 	Wall = require("./Wall"),
-	Grid = require("./Grid");
+	GUI = require("./GUI");
 
 var canvas = global.canvas = document.getElementById("plate");
 var ctx = global.ctx = canvas.getContext("2d");
 
-// Event handlers
-window.addEventListener("resize", Wall.onresize);
 
 // Grab the starting coordinates
 if(window.location.hash) {
@@ -15,11 +13,20 @@ if(window.location.hash) {
 		.map(function(coord) { return parseInt(coord); })
 		.slice(0, 2);
 
-	Wall.x = coords[0];
-	Wall.y = coords[1];
+	if(coords[0] && coords[1]) {
+		Wall.x = coords[0];
+		Wall.y = coords[1];
+
+		GUI.setCoords(Wall.x, Wall.y);
+	}
 }
 
-window.wall = Wall;
+// Expose for debugging
+window.wall = Wall; // TIL THE SWEAT DROPS DOWN MA BALLS
+window.gui = GUI;
+
+// Initilize the GUI
+GUI.init();
 
 // Initilize the wall
 Wall.init();

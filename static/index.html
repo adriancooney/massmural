@@ -1,11 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Page</title>
+    <title>Mass mural - Collaborative online painting</title>
     <link rel="stylesheet" type="text/css" href="style/index.css">
 </head>
 <body>
 	<canvas id="plate"></canvas>
+	<div id="gui">
+		<div class="position">
+			<span id="coords">(0, 0)</span>
+		</div>
+		<div class="loader">
+			<img src="image/loader.gif">
+		</div>
+		<div class="footer">
+			<p>Press <strong>b</strong> to cycle through brushes and <strong>[ ]</strong> to change the size. Press <strong>c</strong> to change color. Mousewheel or <strong>shift</strong> and drag to pan. Created by <a href="http://adriancooney.github.io">Adrian Cooney</a>.</p>
+		</div>
+		<div class="link">
+			<a href="#" id="link"></a>
+		</div>
+	</div>
 </body>
 <script src="function/main.js" type="text/javascript"></script>
 </html>
